@@ -1,38 +1,34 @@
-#!/usr/bin/env bash
+#!/usr/local/bin/bash
 set -euo pipefail
 
-# 1. Dynamically find where the central Homebrew environment lives on this Mac
-if [ -d "/opt/homebrew/bin" ]; then
-    BREW_PREFIX="/opt/homebrew"
-elif [ -d "/usr/local/bin" ] && [ -f "/usr/local/bin/brew" ]; then
-    BREW_PREFIX="/usr/local"
-else
-    # Fallback checking if it's an alternate user-space prefix (Option 1)
-    BREW_PREFIX=$(command -v brew | sed 's#/bin/brew##' || echo "")
-fi
-
-# 2. Construct the strict path execution block prioritizing central tools + virtualenv
 CONFIG="${LITELLM_CONFIG:-$HOME/.config/litellm/config.yaml}"
-VENV_BIN="$HOME/.local/share/litellm/.venv/bin"
 
-if [ -n "$BREW_PREFIX" ]; then
-    export PATH="$VENV_BIN:$HOME/.local/bin:$BREW_PREFIX/bin:$BREW_PREFIX/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
-else
-    export PATH="$VENV_BIN:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-fi
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 
 if [ ! -f "$CONFIG" ]; then
-    echo "❌ LiteLLM config not found at: $CONFIG" >&2
+    echo "LiteLLM config not found: $CONFIG" >&2
     exit 1
 fi
 
-# 3. Extract environment variable keys securely
-REQUIRED_VARS=$(grep -rhoE 'os\.environ/[A-Z0-9_]+' "$CONFIG" | sed 's#os\.environ/##' | sort -u)
+# Extract unique environment variable names from e.g. :
+# api_key: os.environ/GEMINI_API_KEY
+mapfile -t REQUIRED_VARS < <(
+    grep -rhoE 'os\.environ/[A-Z0-9_]+' "$CONFIG" |
+    sed 's#os\.environ/##' |
+    sort -u
+)
+
+# load secret that has been added like this:
+# security add-generic-password \
+#   -U \
+#   -a "$USER" \
+#   -s GEMINI_API_KEY \
+#   -w 'your-gemini-key'
 
 load_secret() {
     local var="$1"
+
     local value
-    
     value="$(
         security find-generic-password \
             -a "$USER" \
@@ -41,17 +37,21 @@ load_secret() {
     )"
 
     if [ -z "$value" ]; then
-        echo "❌ Missing Keychain entry: $var for user $USER" >&2
+        echo "Missing Keychain entry: $var" >&2
         return 1
     fi
 
-    echo "✅ Loaded credentials for $var"
+    echo "Loaded and exporting key for $var"
     export "$var=$value"
 }
 
-for var in $REQUIRED_VARS; do
+for var in "${REQUIRED_VARS[@]}"; do
     load_secret "$var"
 done
 
-echo "🚀 Starting LiteLLM proxy gateway for $USER..."
-exec litellm --config "$CONFIG" --host 127.0.0.1 --port 4000
+echo "Starting LiteLLM"
+
+exec litellm \
+    --config "$CONFIG" \
+    --host 127.0.0.1 \
+    --port 4000
