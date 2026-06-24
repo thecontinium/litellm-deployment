@@ -65,29 +65,4 @@ echo "👉 Post-Installation Steps for $USER:"
 echo "1. Run: security add-generic-password -U -a \"$USER\" -s GEMINI_API_KEY -w 'your_key'"
 echo "2. Stream runtime daemon console outputs using:"
 echo "   tail -f ~/Library/Logs/litellm.log"
-echo "=================================================="else
-  echo "skip: Existing configuration layout detected."
-fi
-
-# 6. Process and Deploy the launchd Plist
-echo "🚀 Configuring launchd service template..."
-TARGET_PLIST="$LAUNCH_AGENTS_DIR/local.litellm.plist"
-
-# Boot out any pre-existing instance to prevent registration locks
-launchctl bootout gui/"$(id -u)" "$TARGET_PLIST" 2>/dev/null || true
-
-# Swap the HOME_DIR token with the real absolute path and write to the system target
-sed "s|HOME_DIR|$HOME|g" local.litellm.plist >"$TARGET_PLIST"
-
-# Register and start the background agent cleanly
-echo "⚙️ Bootstrapping launchd background service..."
-launchctl bootstrap gui/"$(id -u)" "$TARGET_PLIST"
-
-echo "=================================================="
-echo "🎉 User-Space Installation Complete!"
-echo "=================================================="
-echo "👉 Post-Installation Steps for $USER:"
-echo "1. Run: security add-generic-password -U -a \"$USER\" -s GEMINI_API_KEY -w 'your_key'"
-echo "2. Stream runtime daemon console outputs using:"
-echo "   tail -f ~/Library/Logs/litellm.log"
 echo "=================================================="
