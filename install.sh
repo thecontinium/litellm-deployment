@@ -14,21 +14,16 @@ fi
 
 # 2. Build isolated user-space storage directories
 LOCAL_BIN="$HOME/.local/bin"
-VENV_DIR="$HOME/.local/share/litellm/.venv"
 CONFIG_DIR="$HOME/.config/litellm"
 LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
 
 mkdir -p "$LOCAL_BIN"
-mkdir -p "$VENV_DIR"
 mkdir -p "$CONFIG_DIR"
 mkdir -p "$LAUNCH_AGENTS_DIR"
 
-# 3. Compile localized virtual environment tracking central uv
-echo "📦 Creating isolated Python environment at $VENV_DIR..."
-uv venv "$VENV_DIR"
-
-echo "🐍 Installing LiteLLM package layers into user environment..."
-"$VENV_DIR/bin/uv" pip install "litellm[proxy]"
+# 3. Use uv tool to cleanly install and automatically link LiteLLM to ~/.local/bin
+echo "📦 Installing LiteLLM package layers as an isolated uv tool..."
+uv tool install --force 'litellm[proxy]'
 
 # 4. Deploy local launcher script
 echo "🚚 Installing litellm-service to $LOCAL_BIN..."
